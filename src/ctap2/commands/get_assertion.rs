@@ -290,10 +290,16 @@ impl PinUvAuthCommand for GetAssertion {
         let supports_uv = info.options.user_verification == Some(true);
         let pin_configured = info.options.client_pin == Some(true);
         let device_protected = supports_uv || pin_configured;
-        let uv_discouraged = uv_req == UserVerificationRequirement::Discouraged;
-        let always_uv = info.options.always_uv == Some(true);
 
-        !always_uv && (!device_protected || uv_discouraged)
+        if info.options.always_uv == Some(true) {
+            return false;
+        }
+
+        match uv_req {
+            UserVerificationRequirement::Required => false,
+            UserVerificationRequirement::Preferred => !device_protected,
+            UserVerificationRequirement::Discouraged => true,
+        }
     }
 }
 
