@@ -5,7 +5,7 @@ use crate::consts::{HIDCmd, CID_BROADCAST};
 use crate::crypto::SharedSecret;
 use crate::ctap2::commands::get_info::AuthenticatorInfo;
 use crate::transport::device_selector::DeviceCommand;
-use crate::transport::{hid::HIDDevice, FidoDevice, HIDError, Nonce};
+use crate::transport::{hid::HIDDevice, Capability, FidoDevice, HIDError, Nonce};
 use crate::u2ftypes::U2FDeviceInfo;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Read, Write};
@@ -144,6 +144,14 @@ impl HIDDevice for Device {
     fn get_property(&self, prop_name: &str) -> io::Result<String> {
         Ok(format!("{prop_name} not implemented"))
     }
+
+    fn get_device_info(&self) -> U2FDeviceInfo {
+        self.dev_info.clone().unwrap()
+    }
+
+    fn set_device_info(&mut self, dev_info: U2FDeviceInfo) {
+        self.dev_info = Some(dev_info);
+    }
 }
 
 impl FidoDevice for Device {
@@ -160,12 +168,10 @@ impl FidoDevice for Device {
         HIDDevice::sendrecv(self, cmd, send, keep_alive)
     }
 
-    fn get_device_info(&self) -> U2FDeviceInfo {
-        self.dev_info.clone().unwrap()
-    }
-
-    fn set_device_info(&mut self, dev_info: U2FDeviceInfo) {
-        self.dev_info = Some(dev_info);
+    fn try_init_ctap2(&self) -> bool {
+        HIDDevice::get_device_info(self)
+            .cap_flags
+            .contains(Capability::CBOR)
     }
 
     fn initialized(&self) -> bool {
