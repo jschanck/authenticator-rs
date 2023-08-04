@@ -44,6 +44,7 @@ pub use ctap2::attestation::AttestationObject;
 pub use ctap2::commands::client_pin::{Pin, PinError};
 pub use ctap2::commands::get_assertion::{Assertion, GetAssertionResult};
 pub use ctap2::commands::get_info::AuthenticatorInfo;
+pub use ctap2::commands::make_credentials::MakeCredentialsResult;
 pub use statemachine::StateMachine;
 pub use status_update::{InteractiveRequest, StatusPinUv, StatusUpdate};
 pub use transport::{FidoDevice, FidoDeviceIO, FidoProtocol, VirtualFidoDevice};
@@ -77,17 +78,8 @@ pub struct KeyHandle {
 
 pub type AppId = Vec<u8>;
 
-#[derive(Debug)]
-pub enum RegisterResult {
-    CTAP1(Vec<u8>, u2ftypes::U2FDeviceInfo),
-    CTAP2(AttestationObject),
-}
-
-#[derive(Debug)]
-pub enum SignResult {
-    CTAP1(AppId, Vec<u8>, Vec<u8>, u2ftypes::U2FDeviceInfo),
-    CTAP2(GetAssertionResult),
-}
+pub type RegisterResult = MakeCredentialsResult;
+pub type SignResult = GetAssertionResult;
 
 pub type ResetResult = ();
 

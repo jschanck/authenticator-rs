@@ -32,14 +32,23 @@ use serde_cbor::{self, de::from_slice, ser, Value};
 use std::fmt;
 use std::io::{Cursor, Read};
 
-#[derive(Debug)]
-pub struct MakeCredentialsResult(pub AttestationObject);
+#[derive(Debug, PartialEq, Eq)]
+pub struct MakeCredentialsResult {
+    pub auth_data: AuthenticatorData,
+    pub att_statement: AttestationStatement,
+}
+
+impl From<AttestationObject> for MakeCredentialsResult {
+    fn from(att_obj: AttestationObject) -> Self {
+        Self {
+            auth_data: att_obj.auth_data,
+            att_statement: att_obj.att_statement,
+        }
+    }
+}
 
 impl MakeCredentialsResult {
-    pub fn from_ctap1(
-        input: &[u8],
-        rp_id_hash: &RpIdHash,
-    ) -> Result<MakeCredentialsResult, CommandError> {
+    pub fn from_ctap1(input: &[u8], rp_id_hash: &RpIdHash) -> Result<Self, CommandError> {
         let mut data = Cursor::new(input);
         let magic_num = read_byte(&mut data).map_err(CommandError::Deserializing)?;
         if magic_num != 0x05 {
@@ -96,12 +105,10 @@ impl MakeCredentialsResult {
             cert_and_sig.signature,
         ));
 
-        let attestation_object = AttestationObject {
+        Ok(Self {
             auth_data,
             att_statement,
-        };
-
-        Ok(MakeCredentialsResult(attestation_object))
+        })
     }
 }
 
@@ -174,10 +181,10 @@ impl<'de> Deserialize<'de> for MakeCredentialsResult {
                     auth_data.ok_or_else(|| M::Error::custom("found no auth_data".to_string()))?;
                 let att_statement = att_statement.unwrap_or(AttestationStatement::None);
 
-                Ok(MakeCredentialsResult(AttestationObject {
+                Ok(MakeCredentialsResult {
                     auth_data,
                     att_statement,
-                }))
+                })
             }
         }
 
@@ -537,13 +544,12 @@ pub(crate) fn dummy_make_credentials_cmd() -> MakeCredentials {
 
 #[cfg(test)]
 pub mod test {
-    use super::{MakeCredentials, MakeCredentialsOptions};
+    use super::{MakeCredentials, MakeCredentialsOptions, MakeCredentialsResult};
     use crate::crypto::{COSEAlgorithm, COSEEC2Key, COSEKey, COSEKeyType, Curve};
     use crate::ctap2::attestation::test::create_attestation_obj;
     use crate::ctap2::attestation::{
-        AAGuid, AttestationCertificate, AttestationObject, AttestationStatement,
-        AttestationStatementFidoU2F, AttestationStatementPacked, AttestedCredentialData,
-        AuthenticatorData, AuthenticatorDataFlags, Signature,
+        AAGuid, AttestationCertificate, AttestationStatement, AttestationStatementFidoU2F,
+        AttestedCredentialData, AuthenticatorData, AuthenticatorDataFlags, Signature,
     };
     use crate::ctap2::client_data::{Challenge, CollectedClientData, TokenBinding, WebauthnType};
     use crate::ctap2::commands::{RequestCtap1, RequestCtap2};
@@ -605,13 +611,12 @@ pub mod test {
             .wire_format()
             .expect("Failed to serialize MakeCredentials request");
         assert_eq!(req_serialized, MAKE_CREDENTIALS_SAMPLE_REQUEST_CTAP2);
-        let attestation_object = req
+        let make_cred_result = req
             .handle_response_ctap2(&mut device, &MAKE_CREDENTIALS_SAMPLE_RESPONSE_CTAP2)
-            .expect("Failed to handle CTAP2 response")
-            .0;
-        let expected = create_attestation_obj();
+            .expect("Failed to handle CTAP2 response");
+        let expected = create_attestation_obj().into();
 
-        assert_eq!(attestation_object, expected);
+        assert_eq!(make_cred_result, expected);
     }
 
     #[test]
@@ -667,10 +672,9 @@ pub mod test {
         );
         let attestation_object = req
             .handle_response_ctap1(Ok(()), &MAKE_CREDENTIALS_SAMPLE_RESPONSE_CTAP1, &())
-            .expect("Failed to handle CTAP1 response")
-            .0;
+            .expect("Failed to handle CTAP1 response");
 
-        let expected = AttestationObject {
+        let expected = MakeCredentialsResult {
             auth_data: AuthenticatorData {
                 rp_id_hash: RpIdHash::from(&[
                     0xA3, 0x79, 0xA6, 0xF6, 0xEE, 0xAF, 0xB9, 0xA5, 0x5E, 0x37, 0x8C, 0x11, 0x80,
