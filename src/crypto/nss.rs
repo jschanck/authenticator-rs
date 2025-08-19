@@ -142,7 +142,8 @@ pub fn ecdsa_p256_sha256_sign_raw(private: &[u8], data: &[u8]) -> Result<Vec<u8>
         imported_private_ptr.into_result()?
     };
 
-    let signature_buf = vec![0; 64];
+    #[allow(unused_mut)]
+    let mut signature_buf = vec![0; 64];
     unsafe {
         PK11_SignWithMechanism(
             *imported_private,
